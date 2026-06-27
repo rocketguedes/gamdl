@@ -345,6 +345,9 @@ class AppleMusicBaseInterface:
             action="get_tags_from_asset_info", asset_id=asset_data["itemId"]
         )
 
+        album_id = asset_data.get("playlistId")
+        album_release_date = await self.get_media_date(album_id) if album_id else None
+
         tags = MediaTags(
             album=asset_data.get("playlistName"),
             album_artist=asset_data.get("playlistArtistName"),
@@ -368,7 +371,7 @@ class AppleMusicBaseInterface:
             composer_sort=asset_data.get("sort-composer"),
             copyright=asset_data.get("copyright"),
             date=(
-                await self.get_media_date(asset_data["playlistId"])
+                album_release_date
                 if use_album_date
                 else (
                     self.parse_date(asset_data["releaseDate"])
@@ -376,6 +379,7 @@ class AppleMusicBaseInterface:
                     else None
                 )
             ),
+            release_date=album_release_date,
             disc=asset_data.get("discNumber"),
             disc_total=asset_data.get("discCount"),
             gapless=asset_data.get("gapless"),

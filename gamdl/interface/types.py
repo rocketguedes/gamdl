@@ -27,6 +27,7 @@ class MediaTags:
     composer_sort: str = None
     copyright: str = None
     date: datetime.date | str = None
+    release_date: datetime.date | str = None
     disc: int = None
     disc_total: int = None
     gapless: bool = None
@@ -68,6 +69,16 @@ class MediaTags:
         else:
             date_mp4 = None
 
+        if isinstance(self.release_date, datetime.date):
+            if date_format is None:
+                release_date_mp4 = self.release_date.isoformat()
+            else:
+                release_date_mp4 = self.release_date.strftime(date_format)
+        elif isinstance(self.release_date, str):
+            release_date_mp4 = self.release_date
+        else:
+            release_date_mp4 = None
+
         mp4_tags = {
             "\xa9alb": self.album,
             "aART": self.album_artist,
@@ -96,6 +107,7 @@ class MediaTags:
             "sonm": self.title_sort,
             "trkn": track_mp4,
             "xid ": self.xid,
+            "----:com.apple.iTunes:RELEASEDATE": release_date_mp4.encode("utf-8") if release_date_mp4 is not None else None,
         }
 
         return {
