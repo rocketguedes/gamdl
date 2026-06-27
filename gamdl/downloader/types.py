@@ -1,6 +1,7 @@
 import uuid
 from dataclasses import dataclass, field
 
+from ..interface.enums import SyncedLyricsFormat
 from ..interface.types import AppleMusicMedia
 
 
@@ -11,5 +12,5 @@ class DownloadItem:
     staged_path: str = None
     final_path: str = None
     playlist_file_path: str = None
-    synced_lyrics_path: str = None
+    synced_lyrics_path: dict[SyncedLyricsFormat, str] = None
     cover_path: str = None

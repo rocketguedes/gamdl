@@ -179,12 +179,23 @@ class AppleMusicDownloader:
             and not self.no_synced_lyrics
             and item.media.lyrics
             and item.media.lyrics.synced
-            and (self.overwrite or not Path(item.synced_lyrics_path).exists())
         ):
-            self._write_synced_lyrics(
-                item.synced_lyrics_path,
-                item.media.lyrics.synced,
-            )
+            if isinstance(item.media.lyrics.synced, dict):
+                for fmt, path in item.synced_lyrics_path.items():
+                    lyric_content = item.media.lyrics.synced.get(fmt)
+                    if lyric_content and (self.overwrite or not Path(path).exists()):
+                        self._write_synced_lyrics(
+                            path,
+                            lyric_content,
+                        )
+            else:
+                for path in item.synced_lyrics_path.values():
+                    if self.overwrite or not Path(path).exists():
+                        self._write_synced_lyrics(
+                            path,
+                            item.media.lyrics.synced,
+                        )
+                    break
 
     async def _download(self, item: DownloadItem) -> None:
         if item.media.error:
