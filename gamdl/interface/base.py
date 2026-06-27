@@ -340,6 +340,9 @@ class AppleMusicBaseInterface:
         asset_data: dict,
         lyrics: str | None = None,
         use_album_date: bool = False,
+        artists: list[str] | None = None,
+        composers: list[str] | None = None,
+        album_artists: list[str] | None = None,
     ) -> MediaTags:
         log = logger.bind(
             action="get_tags_from_asset_info", asset_id=asset_data["itemId"]
@@ -350,19 +353,20 @@ class AppleMusicBaseInterface:
 
         tags = MediaTags(
             album=asset_data.get("playlistName"),
-            album_artist=asset_data.get("playlistArtistName"),
+            album_artist=album_artists if album_artists else asset_data.get("playlistArtistName"),
             album_id=(
                 int(asset_data["playlistId"]) if asset_data.get("playlistId") else None
             ),
             album_sort=asset_data.get("sort-album"),
             artist=asset_data["artistName"],
+            artists=artists if artists else [asset_data["artistName"]],
             artist_id=(
                 int(asset_data["artistId"]) if asset_data.get("artistId") else None
             ),
-            artist_sort=asset_data["sort-artist"],
+            artist_sort=asset_data.get("sort-artist"),
             comment=asset_data.get("comments"),
             compilation=asset_data.get("compilation"),
-            composer=asset_data.get("composerName"),
+            composer=composers if composers else asset_data.get("composerName"),
             composer_id=(
                 int(asset_data.get("composerId"))
                 if asset_data.get("composerId")

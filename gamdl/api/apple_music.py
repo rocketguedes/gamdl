@@ -301,7 +301,7 @@ class AppleMusicApi:
         self,
         song_id: str,
         extend: str = "extendedAssetUrls",
-        include: str = "lyrics,albums",
+        include: str = "lyrics,albums,artists,composers",
     ) -> dict:
         log = logger.bind(action="get_song", song_id=song_id)
 
@@ -364,17 +364,22 @@ class AppleMusicApi:
         self,
         album_id: str,
         extend: str = "extendedAssetUrls",
+        include: str = "artists",
     ) -> dict:
         log = logger.bind(action="get_album", album_id=album_id)
+
+        params = {
+            "extend": extend,
+        }
+        if include:
+            params["include"] = include
 
         album = await self._amp_request(
             APPLE_MUSIC_ALBUM_API_URI.format(
                 storefront=self.storefront,
                 album_id=album_id,
             ),
-            {
-                "extend": extend,
-            },
+            params,
         )
 
         log.debug("success", album=album)

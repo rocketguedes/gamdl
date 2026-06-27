@@ -197,7 +197,12 @@ class AppleMusicBaseDownloader:
             formatted_part = CustomStringFormatter().format(
                 part,
                 album=(tags.album, "Unknown Album"),
-                album_artist=(tags.album_artist, "Unknown Artist"),
+                album_artist=(
+                    tags.album_artist[0]
+                    if isinstance(tags.album_artist, list)
+                    else tags.album_artist,
+                    "Unknown Artist",
+                ),
                 album_id=(tags.album_id, "Unknown Album ID"),
                 artist=(tags.artist, "Unknown Artist"),
                 artist_id=(tags.artist_id, "Unknown Artist ID"),

@@ -14,15 +14,16 @@ class Lyrics:
 @dataclass
 class MediaTags:
     album: str = None
-    album_artist: str = None
+    album_artist: str | list[str] = None
     album_id: int = None
     album_sort: str = None
     artist: str = None
+    artists: list[str] = None
     artist_id: int = None
     artist_sort: str = None
     comment: str = None
     compilation: bool = None
-    composer: str = None
+    composer: str | list[str] = None
     composer_id: int = None
     composer_sort: str = None
     copyright: str = None
@@ -79,9 +80,23 @@ class MediaTags:
         else:
             release_date_mp4 = None
 
+        if isinstance(self.album_artist, list):
+            album_artist_mp4 = [a if isinstance(a, str) else a.decode("utf-8") for a in self.album_artist]
+        elif isinstance(self.album_artist, str):
+            album_artist_mp4 = self.album_artist
+        else:
+            album_artist_mp4 = None
+
+        if isinstance(self.composer, list):
+            composer_mp4 = [c if isinstance(c, str) else c.decode("utf-8") for c in self.composer]
+        elif isinstance(self.composer, str):
+            composer_mp4 = self.composer
+        else:
+            composer_mp4 = None
+
         mp4_tags = {
             "\xa9alb": self.album,
-            "aART": self.album_artist,
+            "aART": album_artist_mp4,
             "plID": self.album_id,
             "soal": self.album_sort,
             "\xa9ART": self.artist,
@@ -89,7 +104,7 @@ class MediaTags:
             "soar": self.artist_sort,
             "\xa9cmt": self.comment,
             "cpil": bool(self.compilation) if self.compilation is not None else None,
-            "\xa9wrt": self.composer,
+            "\xa9wrt": composer_mp4,
             "cmID": self.composer_id,
             "soco": self.composer_sort,
             "cprt": self.copyright,
@@ -108,10 +123,11 @@ class MediaTags:
             "trkn": track_mp4,
             "xid ": self.xid,
             "----:com.apple.iTunes:RELEASEDATE": release_date_mp4.encode("utf-8") if release_date_mp4 is not None else None,
+            "----:com.apple.iTunes:ARTISTS": [a.encode("utf-8") if isinstance(a, str) else a for a in self.artists] if self.artists is not None else None,
         }
 
         return {
-            k: ([v] if not isinstance(v, bool) else v)
+            k: ([v] if not isinstance(v, bool) and (not isinstance(v, list) or (isinstance(v, list) and len(v) > 0 and isinstance(v[0], (int, float)))) else v)
             for k, v in mp4_tags.items()
             if v is not None
         }

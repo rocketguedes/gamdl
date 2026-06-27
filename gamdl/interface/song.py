@@ -30,6 +30,36 @@ from .types import (
 logger = structlog.get_logger(__name__)
 
 
+def resolve_names(names_str: str | None, relationship_names: list[str]) -> list[str]:
+    if not names_str:
+        return []
+    if not relationship_names:
+        parts = re.split(r'\s*(?:,|&|\band\b|/|\bfeat\.?|\bft\.?|\bfeaturing)\s*', names_str, flags=re.IGNORECASE)
+        return [p.strip() for p in parts if p.strip()]
+
+    sorted_rel_names = sorted(relationship_names, key=len, reverse=True)
+    placeholders = {}
+    temp_str = names_str
+    for i, rel_name in enumerate(sorted_rel_names):
+        placeholder = f"__REL_PLACEHOLDER_{i}__"
+        escaped_name = re.escape(rel_name)
+        temp_str = re.sub(r'(?<!\w)' + escaped_name + r'(?!\w)', placeholder, temp_str)
+        placeholders[placeholder] = rel_name
+
+    parts = re.split(r'\s*(?:,|&|\band\b|/|\bfeat\.?|\bft\.?|\bfeaturing)\s*', temp_str, flags=re.IGNORECASE)
+    resolved = []
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        if part in placeholders:
+            resolved.append(placeholders[part])
+        else:
+            resolved.append(part)
+
+    return resolved
+
+
 class AppleMusicSongInterface:
     def __init__(
         self,
@@ -534,7 +564,9 @@ class AppleMusicSongInterface:
             if catalog_metadata:
                 media.media_id = catalog_metadata["id"]
                 media.is_library = False
-                media.media_metadata = catalog_metadata
+                media.media_metadata = (
+                    await self.base.apple_music_api.get_song(media.media_id)
+                )["data"][0]
 
         yield media
 
@@ -575,17 +607,72 @@ class AppleMusicSongInterface:
                 media.is_library,
             )
 
+        artists_rel = [
+            a["attributes"]["name"]
+            for a in media.media_metadata.get("relationships", {})
+            .get("artists", {})
+            .get("data", [])
+            if a.get("attributes", {}).get("name")
+        ]
+        composers_rel = [
+            c["attributes"]["name"]
+            for c in media.media_metadata.get("relationships", {})
+            .get("composers", {})
+            .get("data", [])
+            if c.get("attributes", {}).get("name")
+        ]
+        album_artists_rel = []
+        album_artist_name = None
+        album_id = (
+            media.media_metadata.get("relationships", {})
+            .get("albums", {})
+            .get("data", [{}])[0]
+            .get("id")
+        )
+        if album_id:
+            try:
+                album_data = await self.base.get_album_cached(album_id)
+                album_artist_name = album_data["attributes"].get("artistName")
+                album_artists_rel = [
+                    a["attributes"]["name"]
+                    for a in album_data.get("relationships", {})
+                    .get("artists", {})
+                    .get("data", [])
+                    if a.get("attributes", {}).get("name")
+                ]
+            except Exception:
+                pass
+
+        artists = resolve_names(
+            media.media_metadata["attributes"].get("artistName"),
+            artists_rel,
+        )
+        composers = resolve_names(
+            media.media_metadata["attributes"].get("composerName"),
+            composers_rel,
+        )
+        album_artists = resolve_names(
+            album_artist_name,
+            album_artists_rel,
+        )
+
         if playback:
             media.tags = await self.base.get_tags_from_asset_info(
                 playback["songList"][0]["assets"][0]["metadata"],
                 media.lyrics.unsynced if media.lyrics else None,
                 self.use_album_date,
+                artists=artists,
+                composers=composers,
+                album_artists=album_artists,
             )
         else:
             media.tags = await self.base.get_tags_from_asset_info(
                 webplayback["songList"][0]["assets"][0]["metadata"],
                 media.lyrics.unsynced if media.lyrics else None,
                 self.use_album_date,
+                artists=artists,
+                composers=composers,
+                album_artists=album_artists,
             )
 
         if not self.skip_stream_info:
