@@ -30,36 +30,6 @@ from .types import (
 logger = structlog.get_logger(__name__)
 
 
-def resolve_names(names_str: str | None, relationship_names: list[str]) -> list[str]:
-    if not names_str:
-        return []
-    if not relationship_names:
-        parts = re.split(r'\s*(?:,|&|\band\b|/|\bfeat\.?|\bft\.?|\bfeaturing)\s*', names_str, flags=re.IGNORECASE)
-        return [p.strip() for p in parts if p.strip()]
-
-    sorted_rel_names = sorted(relationship_names, key=len, reverse=True)
-    placeholders = {}
-    temp_str = names_str
-    for i, rel_name in enumerate(sorted_rel_names):
-        placeholder = f"__REL_PLACEHOLDER_{i}__"
-        escaped_name = re.escape(rel_name)
-        temp_str = re.sub(r'(?<!\w)' + escaped_name + r'(?!\w)', placeholder, temp_str)
-        placeholders[placeholder] = rel_name
-
-    parts = re.split(r'\s*(?:,|&|\band\b|/|\bfeat\.?|\bft\.?|\bfeaturing)\s*', temp_str, flags=re.IGNORECASE)
-    resolved = []
-    for part in parts:
-        part = part.strip()
-        if not part:
-            continue
-        if part in placeholders:
-            resolved.append(placeholders[part])
-        else:
-            resolved.append(part)
-
-    return resolved
-
-
 class AppleMusicSongInterface:
     def __init__(
         self,
@@ -548,7 +518,17 @@ class AppleMusicSongInterface:
         self,
         media: AppleMusicMedia,
     ) -> AsyncGenerator[AppleMusicMedia, None]:
-        if not media.media_metadata:
+        if (
+            not media.media_metadata
+            or (
+                not media.is_library
+                and (
+                    "relationships" not in media.media_metadata
+                    or "artists" not in media.media_metadata["relationships"]
+                    or "composers" not in media.media_metadata["relationships"]
+                )
+            )
+        ):
             media.media_metadata = (
                 await (
                     self.base.apple_music_api.get_library_song(media.media_id)
@@ -614,13 +594,7 @@ class AppleMusicSongInterface:
             .get("data", [])
             if a.get("attributes", {}).get("name")
         ]
-        composers_rel = [
-            c["attributes"]["name"]
-            for c in media.media_metadata.get("relationships", {})
-            .get("composers", {})
-            .get("data", [])
-            if c.get("attributes", {}).get("name")
-        ]
+        
         album_artists_rel = []
         album_artist_name = None
         album_id = (
@@ -643,18 +617,44 @@ class AppleMusicSongInterface:
             except Exception:
                 pass
 
-        artists = resolve_names(
-            media.media_metadata["attributes"].get("artistName"),
-            artists_rel,
-        )
-        composers = resolve_names(
-            media.media_metadata["attributes"].get("composerName"),
-            composers_rel,
-        )
-        album_artists = resolve_names(
-            album_artist_name,
-            album_artists_rel,
-        )
+        artist_name = media.media_metadata["attributes"].get("artistName")
+        artists = artists_rel if artists_rel else ([artist_name] if artist_name else [])
+        album_artists = album_artists_rel if album_artists_rel else ([album_artist_name] if album_artist_name else [])
+
+        # Fetch composers from credits endpoint if available
+        composers = []
+        if not media.is_library and self.base.apple_music_api:
+            try:
+                credits_data = await self.base.get_song_credits_cached(media.media_id)
+                for category in credits_data.get("data", []):
+                    if category.get("attributes", {}).get("kind") == "composer-and-lyrics":
+                        composers = [
+                            artist["attributes"]["name"]
+                            for artist in category.get("relationships", {})
+                            .get("credit-artists", {})
+                            .get("data", [])
+                            if artist.get("attributes", {}).get("name")
+                        ]
+                        break
+            except Exception:
+                pass
+
+        # Fallback to standard song resource composers relationship
+        if not composers:
+            composers = [
+                c["attributes"]["name"]
+                for c in media.media_metadata.get("relationships", {})
+                .get("composers", {})
+                .get("data", [])
+                if c.get("attributes", {}).get("name")
+            ]
+
+        composer_sort = None
+        if composers:
+            if len(composers) > 1:
+                composer_sort = ", ".join(composers[:-1]) + " & " + composers[-1]
+            else:
+                composer_sort = composers[0]
 
         if playback:
             media.tags = await self.base.get_tags_from_asset_info(
@@ -664,6 +664,7 @@ class AppleMusicSongInterface:
                 artists=artists,
                 composers=composers,
                 album_artists=album_artists,
+                composer_sort=composer_sort,
             )
         else:
             media.tags = await self.base.get_tags_from_asset_info(
@@ -673,6 +674,7 @@ class AppleMusicSongInterface:
                 artists=artists,
                 composers=composers,
                 album_artists=album_artists,
+                composer_sort=composer_sort,
             )
 
         if not self.skip_stream_info:

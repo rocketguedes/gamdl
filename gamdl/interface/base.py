@@ -159,6 +159,13 @@ class AppleMusicBaseInterface:
     ) -> dict | None:
         return (await self.apple_music_api.get_album(album_id))["data"][0]
 
+    @alru_cache()
+    async def get_song_credits_cached(
+        self,
+        song_id: str,
+    ) -> dict | None:
+        return await self.apple_music_api.get_song_credits(song_id)
+
     async def get_decryption_key(
         self,
         pssh: str,
@@ -343,6 +350,7 @@ class AppleMusicBaseInterface:
         artists: list[str] | None = None,
         composers: list[str] | None = None,
         album_artists: list[str] | None = None,
+        composer_sort: str | None = None,
     ) -> MediaTags:
         log = logger.bind(
             action="get_tags_from_asset_info", asset_id=asset_data["itemId"]
@@ -372,7 +380,7 @@ class AppleMusicBaseInterface:
                 if asset_data.get("composerId")
                 else None
             ),
-            composer_sort=asset_data.get("sort-composer"),
+            composer_sort=composer_sort if composer_sort else asset_data.get("sort-composer"),
             copyright=asset_data.get("copyright"),
             date=(
                 album_release_date

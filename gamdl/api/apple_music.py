@@ -26,6 +26,7 @@ from .constants import (
     APPLE_MUSIC_LIBRARY_SONG_API_URI,
     APPLE_MUSIC_LIBRARY_SONGS_API_URI,
     APPLE_MUSIC_SONG_API_URI,
+    APPLE_MUSIC_SONG_CREDITS_API_URI,
     APPLE_MUSIC_UPLOADED_VIDEO_API_URL,
     APPLE_MUSIC_WEBPLAYBACK_API_URL,
 )
@@ -319,6 +320,23 @@ class AppleMusicApi:
         log.debug("success", song=song)
 
         return song
+
+    async def get_song_credits(
+        self,
+        song_id: str,
+    ) -> dict:
+        log = logger.bind(action="get_song_credits", song_id=song_id)
+
+        credits = await self._amp_request(
+            APPLE_MUSIC_SONG_CREDITS_API_URI.format(
+                storefront=self.storefront,
+                song_id=song_id,
+            ),
+        )
+
+        log.debug("success", credits=credits)
+
+        return credits
 
     async def get_music_video(
         self,
