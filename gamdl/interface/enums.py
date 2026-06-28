@@ -12,6 +12,7 @@ from .constants import (
 
 class SyncedLyricsFormat(Enum):
     LRC = "lrc"
+    ELRC = "elrc"
     SRT = "srt"
     TTML = "ttml"
 

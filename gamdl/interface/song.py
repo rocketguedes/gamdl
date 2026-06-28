@@ -59,42 +59,53 @@ class AppleMusicSongInterface:
             song_id=song_metadata["id"],
         )
 
-        if song_metadata["attributes"]["playParams"].get("isLibrary"):
+        if song_metadata["attributes"].get("playParams", {}).get("isLibrary"):
             log.debug("library_song_no_lyrics")
             return None
 
-        if not song_metadata["attributes"]["hasLyrics"]:
+        if not song_metadata["attributes"].get("hasLyrics"):
             log.debug("no_lyrics")
             return None
 
-        if (
-            "relationships" not in song_metadata
-            or "lyrics" not in song_metadata["relationships"]
-        ):
-            song_metadata = (
-                await self.base.apple_music_api.get_song(
-                    song_metadata["id"],
-                )
-            )["data"][0]
+        ttml = None
+        # First, try to fetch syllable-lyrics (word-by-word synced lyrics)
+        if self.base.apple_music_api:
+            try:
+                syllable_url = f"/v1/catalog/{self.base.apple_music_api.storefront}/songs/{song_metadata['id']}/syllable-lyrics"
+                res = await self.base.apple_music_api._amp_request(syllable_url)
+                if "data" in res and res["data"]:
+                    ttml = res["data"][0]["attributes"].get("ttml")
+                    log.debug("syllable_lyrics_fetched")
+            except Exception:
+                # Silently ignore and fall back to standard lyrics
+                pass
 
-        if (
-            "lyrics" in song_metadata["relationships"]
-            and "data" in song_metadata["relationships"]["lyrics"]
-            and len(song_metadata["relationships"]["lyrics"]["data"]) > 0
-            and "attributes" in song_metadata["relationships"]["lyrics"]["data"][0]
-            and song_metadata["relationships"]["lyrics"]["data"][0]["attributes"].get(
-                "ttml"
-            )
-            is not None
-        ):
-            lyrics = self._get_lyrics(
-                song_metadata["relationships"]["lyrics"]["data"][0]["attributes"][
+        if not ttml:
+            if (
+                "relationships" not in song_metadata
+                or "lyrics" not in song_metadata["relationships"]
+            ):
+                song_metadata = (
+                    await self.base.apple_music_api.get_song(
+                        song_metadata["id"],
+                    )
+                )["data"][0]
+
+            if (
+                "lyrics" in song_metadata["relationships"]
+                and "data" in song_metadata["relationships"]["lyrics"]
+                and len(song_metadata["relationships"]["lyrics"]["data"]) > 0
+                and "attributes" in song_metadata["relationships"]["lyrics"]["data"][0]
+                and song_metadata["relationships"]["lyrics"]["data"][0]["attributes"].get(
                     "ttml"
-                ],
-            )
+                )
+                is not None
+            ):
+                ttml = song_metadata["relationships"]["lyrics"]["data"][0]["attributes"]["ttml"]
 
+        if ttml:
+            lyrics = self._get_lyrics(ttml)
             log.debug("success", lyrics=lyrics)
-
             return lyrics
         else:
             log.debug("no_lyrics_data")
@@ -111,8 +122,9 @@ class AppleMusicSongInterface:
             unsynced_lyrics.append(stanza)
 
             for p in div.iter("{http://www.w3.org/ns/ttml}p"):
-                if p.text is not None:
-                    stanza.append(p.text)
+                text = "".join(p.itertext()).strip()
+                if text:
+                    stanza.append(text)
 
         synced_lyrics_dict = {}
         for fmt in self.synced_lyrics_format:
@@ -126,7 +138,9 @@ class AppleMusicSongInterface:
                 for p in div.iter("{http://www.w3.org/ns/ttml}p"):
                     if p.attrib.get("begin"):
                         if fmt == SyncedLyricsFormat.LRC:
-                            synced_lyrics.append(self._get_lyrics_line_lrc(p))
+                            synced_lyrics.append(self._get_lyrics_line_lrc(p, enhanced=False))
+                        elif fmt == SyncedLyricsFormat.ELRC:
+                            synced_lyrics.append(self._get_lyrics_line_lrc(p, enhanced=True))
                         elif fmt == SyncedLyricsFormat.SRT:
                             synced_lyrics.append(self._get_lyrics_line_srt(index, p))
                         index += 1
@@ -168,7 +182,7 @@ class AppleMusicSongInterface:
     def _get_lyrics_line_srt(self, index: int, element: ElementTree.Element) -> str:
         timestamp_begin_ttml = element.attrib.get("begin")
         timestamp_end_ttml = element.attrib.get("end")
-        text = element.text
+        text = "".join(element.itertext()).strip()
 
         timestamp_begin = self._parse_ttml_timestamp(timestamp_begin_ttml)
         timestamp_end = self._parse_ttml_timestamp(timestamp_end_ttml)
@@ -180,9 +194,33 @@ class AppleMusicSongInterface:
             f"{text}\n"
         )
 
-    def _get_lyrics_line_lrc(self, element: ElementTree.Element) -> str:
+    def _get_lyrics_line_lrc(self, element: ElementTree.Element, enhanced: bool = False) -> str:
         timestamp_ttml = element.attrib.get("begin")
-        text = element.text
+        
+        # Check if we have span children for Enhanced LRC
+        spans = list(element)
+        if enhanced and spans and any(child.tag.split("}")[-1] == "span" for child in spans):
+            line_parts = []
+            for child in element:
+                if child.tag.split("}")[-1] == "span":
+                    span_begin = child.attrib.get("begin")
+                    span_text = child.text or ""
+                    span_tail = child.tail or ""
+                    if span_begin:
+                        ts = self._parse_ttml_timestamp(span_begin)
+                        ms_new = ts.strftime("%f")[:-3]
+                        if int(ms_new[-1]) >= 5:
+                            ms = int(f"{int(ms_new[:2]) + 1}") * 10
+                            ts += datetime.timedelta(milliseconds=ms) - datetime.timedelta(
+                                microseconds=ts.microsecond
+                            )
+                        ts_str = f"<{ts.strftime('%M:%S.%f')[:-4]}>"
+                        line_parts.append(f"{ts_str}{span_text}{span_tail}")
+                    else:
+                        line_parts.append(f"{span_text}{span_tail}")
+            text = "".join(line_parts)
+        else:
+            text = "".join(element.itertext()).strip()
 
         timestamp = self._parse_ttml_timestamp(timestamp_ttml)
         ms_new = timestamp.strftime("%f")[:-3]
