@@ -37,6 +37,7 @@ class MediaTags:
     lyrics: str = None
     media_type: MediaType = None
     rating: MediaRating = None
+    releasetype: str = None
     storefront: str = None
     title: str = None
     title_id: int = None
@@ -124,6 +125,7 @@ class MediaTags:
             "xid ": self.xid,
             "----:com.apple.iTunes:RELEASEDATE": release_date_mp4.encode("utf-8") if release_date_mp4 is not None else None,
             "----:com.apple.iTunes:ARTISTS": [a.encode("utf-8") if isinstance(a, str) else a for a in self.artists] if self.artists is not None else None,
+            "----:com.apple.iTunes:RELEASETYPE": self.releasetype.encode("utf-8") if self.releasetype is not None else None,
         }
 
         return {

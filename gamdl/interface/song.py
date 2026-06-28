@@ -597,6 +597,7 @@ class AppleMusicSongInterface:
         
         album_artists_rel = []
         album_artist_name = None
+        is_single = False
         album_id = (
             media.media_metadata.get("relationships", {})
             .get("albums", {})
@@ -607,6 +608,7 @@ class AppleMusicSongInterface:
             try:
                 album_data = await self.base.get_album_cached(album_id)
                 album_artist_name = album_data["attributes"].get("artistName")
+                is_single = album_data["attributes"].get("isSingle", False)
                 album_artists_rel = [
                     a["attributes"]["name"]
                     for a in album_data.get("relationships", {})
@@ -620,6 +622,7 @@ class AppleMusicSongInterface:
         artist_name = media.media_metadata["attributes"].get("artistName")
         artists = artists_rel if artists_rel else ([artist_name] if artist_name else [])
         album_artists = album_artists_rel if album_artists_rel else ([album_artist_name] if album_artist_name else [])
+        releasetype = "single" if is_single else "album" if album_id else None
 
         # Fetch composers from credits endpoint if available
         composers = []
@@ -665,6 +668,7 @@ class AppleMusicSongInterface:
                 composers=composers,
                 album_artists=album_artists,
                 composer_sort=composer_sort,
+                releasetype=releasetype,
             )
         else:
             media.tags = await self.base.get_tags_from_asset_info(
@@ -675,6 +679,7 @@ class AppleMusicSongInterface:
                 composers=composers,
                 album_artists=album_artists,
                 composer_sort=composer_sort,
+                releasetype=releasetype,
             )
 
         if not self.skip_stream_info:

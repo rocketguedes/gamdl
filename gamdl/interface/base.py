@@ -351,6 +351,7 @@ class AppleMusicBaseInterface:
         composers: list[str] | None = None,
         album_artists: list[str] | None = None,
         composer_sort: str | None = None,
+        releasetype: str | None = None,
     ) -> MediaTags:
         log = logger.bind(
             action="get_tags_from_asset_info", asset_id=asset_data["itemId"]
@@ -406,6 +407,7 @@ class AppleMusicBaseInterface:
                 else MediaType.MUSIC_VIDEO
             ),
             rating=MediaRating(asset_data["explicit"]),
+            releasetype=releasetype,
             storefront=(int(asset_data["s"]) if asset_data.get("s") else None),
             title=asset_data["itemName"],
             title_id=int(asset_data["itemId"]),
