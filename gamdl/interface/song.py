@@ -598,6 +598,7 @@ class AppleMusicSongInterface:
         album_artists_rel = []
         album_artist_name = None
         is_single = False
+        is_compilation = False
         album_id = (
             media.media_metadata.get("relationships", {})
             .get("albums", {})
@@ -609,6 +610,7 @@ class AppleMusicSongInterface:
                 album_data = await self.base.get_album_cached(album_id)
                 album_artist_name = album_data["attributes"].get("artistName")
                 is_single = album_data["attributes"].get("isSingle", False)
+                is_compilation = album_data["attributes"].get("isCompilation", False)
                 album_artists_rel = [
                     a["attributes"]["name"]
                     for a in album_data.get("relationships", {})
@@ -621,7 +623,22 @@ class AppleMusicSongInterface:
 
         artist_name = media.media_metadata["attributes"].get("artistName")
         artists = artists_rel if artists_rel else ([artist_name] if artist_name else [])
-        album_artists = album_artists_rel if album_artists_rel else ([album_artist_name] if album_artist_name else [])
+        
+        various_artists_translations = [
+            "various artists",
+            "vários intérpretes",
+            "vários artistas",
+            "varios artistas",
+            "various",
+            "divers artistes",
+            "verschiedene interpreten",
+            "artisti vari",
+            "diverse artiesten",
+        ]
+        if album_artist_name and album_artist_name.lower() in various_artists_translations:
+            album_artists = ["Various Artists"]
+        else:
+            album_artists = album_artists_rel if album_artists_rel else ([album_artist_name] if album_artist_name else [])
         releasetype = "single" if is_single else "album" if album_id else None
 
         # Fetch composers from credits endpoint if available
