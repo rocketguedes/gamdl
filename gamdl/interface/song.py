@@ -126,8 +126,17 @@ class AppleMusicSongInterface:
                 if text:
                     stanza.append(text)
 
+        has_syllables = any(
+            child.tag.split("}")[-1] == "span"
+            for p in lyrics_ttml_et.iter("{http://www.w3.org/ns/ttml}p")
+            for child in p
+        )
+
         synced_lyrics_dict = {}
         for fmt in self.synced_lyrics_format:
+            if fmt == SyncedLyricsFormat.ELRC and not has_syllables:
+                continue
+
             synced_lyrics = []
             index = 1
             if fmt == SyncedLyricsFormat.TTML:
