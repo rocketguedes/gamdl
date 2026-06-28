@@ -128,8 +128,17 @@ class MediaTags:
             "----:com.apple.iTunes:RELEASETYPE": self.releasetype.encode("utf-8") if self.releasetype is not None else None,
         }
 
+        def format_mp4_value(val: Any) -> Any:
+            if isinstance(val, bool):
+                return val
+            if isinstance(val, list):
+                if val and isinstance(val[0], (str, bytes)):
+                    return val
+                return [val]
+            return [val]
+
         return {
-            k: ([v] if not isinstance(v, bool) and (not isinstance(v, list) or (isinstance(v, list) and len(v) > 0 and isinstance(v[0], (int, float)))) else v)
+            k: format_mp4_value(v)
             for k, v in mp4_tags.items()
             if v is not None
         }

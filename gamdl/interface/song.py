@@ -587,11 +587,10 @@ class AppleMusicSongInterface:
                 media.is_library,
             )
 
+        relationships = media.media_metadata.get("relationships") or {}
         artists_rel = [
             a["attributes"]["name"]
-            for a in media.media_metadata.get("relationships", {})
-            .get("artists", {})
-            .get("data", [])
+            for a in (relationships.get("artists") or {}).get("data") or []
             if a.get("attributes", {}).get("name")
         ]
         
@@ -599,23 +598,18 @@ class AppleMusicSongInterface:
         album_artist_name = None
         is_single = False
         is_compilation = False
-        album_id = (
-            media.media_metadata.get("relationships", {})
-            .get("albums", {})
-            .get("data", [{}])[0]
-            .get("id")
-        )
+        albums_data = (relationships.get("albums") or {}).get("data") or []
+        album_id = albums_data[0].get("id") if albums_data else None
         if album_id:
             try:
                 album_data = await self.base.get_album_cached(album_id)
                 album_artist_name = album_data["attributes"].get("artistName")
                 is_single = album_data["attributes"].get("isSingle", False)
                 is_compilation = album_data["attributes"].get("isCompilation", False)
+                album_relationships = album_data.get("relationships") or {}
                 album_artists_rel = [
                     a["attributes"]["name"]
-                    for a in album_data.get("relationships", {})
-                    .get("artists", {})
-                    .get("data", [])
+                    for a in (album_relationships.get("artists") or {}).get("data") or []
                     if a.get("attributes", {}).get("name")
                 ]
             except Exception:
@@ -634,8 +628,14 @@ class AppleMusicSongInterface:
             "verschiedene interpreten",
             "artisti vari",
             "diverse artiesten",
+            "ヴァリアス・アーティスト",
+            "オムニバス",
+            "群星",
+            "различные исполнители",
+            "разные артисты",
+            "여러 아티스트",
         ]
-        if album_artist_name and album_artist_name.lower() in various_artists_translations:
+        if album_artist_name and album_artist_name.strip().lower() in various_artists_translations:
             album_artists = ["Various Artists"]
         else:
             album_artists = album_artists_rel if album_artists_rel else ([album_artist_name] if album_artist_name else [])
@@ -648,11 +648,10 @@ class AppleMusicSongInterface:
                 credits_data = await self.base.get_song_credits_cached(media.media_id)
                 for category in credits_data.get("data", []):
                     if category.get("attributes", {}).get("kind") == "composer-and-lyrics":
+                        category_relationships = category.get("relationships") or {}
                         composers = [
                             artist["attributes"]["name"]
-                            for artist in category.get("relationships", {})
-                            .get("credit-artists", {})
-                            .get("data", [])
+                            for artist in (category_relationships.get("credit-artists") or {}).get("data") or []
                             if artist.get("attributes", {}).get("name")
                         ]
                         break
@@ -663,9 +662,7 @@ class AppleMusicSongInterface:
         if not composers:
             composers = [
                 c["attributes"]["name"]
-                for c in media.media_metadata.get("relationships", {})
-                .get("composers", {})
-                .get("data", [])
+                for c in (relationships.get("composers") or {}).get("data") or []
                 if c.get("attributes", {}).get("name")
             ]
 
