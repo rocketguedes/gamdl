@@ -596,6 +596,7 @@ class AppleMusicSongInterface:
         
         album_artists_rel = []
         album_artist_name = None
+        album_name = None
         is_single = False
         is_compilation = False
         albums_data = (relationships.get("albums") or {}).get("data") or []
@@ -604,6 +605,7 @@ class AppleMusicSongInterface:
             try:
                 album_data = await self.base.get_album_cached(album_id)
                 album_artist_name = album_data["attributes"].get("artistName")
+                album_name = album_data["attributes"].get("name")
                 is_single = album_data["attributes"].get("isSingle", False)
                 is_compilation = album_data["attributes"].get("isCompilation", False)
                 album_relationships = album_data.get("relationships") or {}
@@ -639,7 +641,14 @@ class AppleMusicSongInterface:
             album_artists = ["Various Artists"]
         else:
             album_artists = album_artists_rel if album_artists_rel else ([album_artist_name] if album_artist_name else [])
-        releasetype = "single" if is_single else "album" if album_id else None
+        
+        album_name_lower = album_name.lower() if album_name else ""
+        if is_single or album_name_lower.endswith(" - single"):
+            releasetype = "single"
+        elif album_name_lower.endswith(" - ep"):
+            releasetype = "ep"
+        else:
+            releasetype = "album" if album_id else None
 
         # Fetch composers from credits endpoint if available
         composers = []
