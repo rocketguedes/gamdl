@@ -694,6 +694,8 @@ class AppleMusicSongInterface:
             releasetype = "single"
         elif album_name_lower.endswith(" - ep"):
             releasetype = "ep"
+        elif is_compilation:
+            releasetype = "compilation"
         else:
             releasetype = "album" if album_id else None
 
