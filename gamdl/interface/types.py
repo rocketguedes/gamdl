@@ -45,6 +45,9 @@ class MediaTags:
     track: int = None
     track_total: int = None
     xid: str = None
+    isrc: str = None
+    upc: str = None
+    record_label: str = None
 
     def as_mp4_tags(self, date_format: str = None) -> dict:
         disc_mp4 = [
@@ -126,6 +129,9 @@ class MediaTags:
             "----:com.apple.iTunes:RELEASEDATE": release_date_mp4.encode("utf-8") if release_date_mp4 is not None else None,
             "----:com.apple.iTunes:ARTISTS": [a.encode("utf-8") if isinstance(a, str) else a for a in self.artists] if self.artists is not None else None,
             "----:com.apple.iTunes:RELEASETYPE": self.releasetype.encode("utf-8") if self.releasetype is not None else None,
+            "----:com.apple.iTunes:ISRC": self.isrc.encode("utf-8") if self.isrc is not None else None,
+            "----:com.apple.iTunes:BARCODE": self.upc.encode("utf-8") if self.upc is not None else None,
+            "----:com.apple.iTunes:LABEL": self.record_label.encode("utf-8") if self.record_label is not None else None,
         }
 
         def format_mp4_value(val: Any) -> Any:

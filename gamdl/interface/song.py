@@ -646,6 +646,8 @@ class AppleMusicSongInterface:
         album_name = None
         is_single = False
         is_compilation = False
+        upc = None
+        record_label = None
         albums_data = (relationships.get("albums") or {}).get("data") or []
         album_id = albums_data[0].get("id") if albums_data else None
         if album_id:
@@ -655,6 +657,8 @@ class AppleMusicSongInterface:
                 album_name = album_data["attributes"].get("name")
                 is_single = album_data["attributes"].get("isSingle", False)
                 is_compilation = album_data["attributes"].get("isCompilation", False)
+                upc = album_data["attributes"].get("upc")
+                record_label = album_data["attributes"].get("recordLabel")
                 album_relationships = album_data.get("relationships") or {}
                 album_artists_rel = [
                     a["attributes"]["name"]
@@ -731,6 +735,8 @@ class AppleMusicSongInterface:
             else:
                 composer_sort = composers[0]
 
+        isrc = media.media_metadata["attributes"].get("isrc")
+
         if playback:
             media.tags = await self.base.get_tags_from_asset_info(
                 playback["songList"][0]["assets"][0]["metadata"],
@@ -753,6 +759,10 @@ class AppleMusicSongInterface:
                 composer_sort=composer_sort,
                 releasetype=releasetype,
             )
+
+        media.tags.isrc = isrc
+        media.tags.upc = upc
+        media.tags.record_label = record_label
 
         if not self.skip_stream_info:
             m3u8_master_url = await self.get_m3u8_master_url(
