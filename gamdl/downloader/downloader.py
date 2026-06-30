@@ -172,17 +172,26 @@ class AppleMusicDownloader:
             )
 
         if item.cover_path and self.save_cover and item.media.cover.template_url:
+            cover_bytes = None
             if self.save_cover_format == CoverFormat.RAW:
                 cover_url = self.base.interface.base._get_raw_cover_url(
                     item.media.cover.template_url
                 )
+                try:
+                    cover_bytes = await self.base.interface.base.get_cover_bytes(cover_url)
+                except Exception as e:
+                    logger.warning("failed_to_download_cover", error=str(e))
             else:
                 cover_url = self.base.interface.base.format_cover(
                     item.media.cover.template_url,
                     self.base.interface.base.cover_size,
                     self.save_cover_format,
                 )
-            cover_bytes = await self.base.interface.base.get_cover_bytes(cover_url)
+                try:
+                    cover_bytes = await self.base.interface.base.get_cover_bytes(cover_url)
+                except Exception as e:
+                    logger.warning("failed_to_download_cover", error=str(e))
+
             if cover_bytes and (self.overwrite or not Path(item.cover_path).exists()):
                 cover_path = item.cover_path
                 try:

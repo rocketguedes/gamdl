@@ -212,7 +212,17 @@ class AppleMusicBaseInterface:
     async def get_cover_bytes(self, cover_url: str) -> bytes | None:
         log = logger.bind(action="get_cover_bytes", cover_url=cover_url)
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        from httpx_retries import Retry, RetryTransport
+
+        transport = RetryTransport(
+            retry=Retry(
+                total=3,
+                backoff_factor=1,
+                status_forcelist=[502, 503, 504, 429],
+            )
+        )
+
+        async with httpx.AsyncClient(timeout=30.0, transport=transport) as client:
             response = await client.get(cover_url, follow_redirects=True)
 
             if response.status_code == 404:
