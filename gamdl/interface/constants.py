@@ -101,3 +101,21 @@ MEDIA_CODEC_FLAVOR_MAP = {
     "aac-fps-web": "30:cbcp256",
     "aac-he-fps-web": "34:cbcp64",
 }
+
+VARIOUS_ARTISTS_TRANSLATIONS = [
+    "various artists",
+    "vários intérpretes",
+    "vários artistas",
+    "varios artistas",
+    "various",
+    "divers artistes",
+    "verschiedene interpreten",
+    "artisti vari",
+    "diverse artiesten",
+    "ヴァリアス・アーティスト",
+    "オムニバス",
+    "群星",
+    "различные исполнители",
+    "разные артисты",
+    "여러 아티스트",
+]

@@ -11,7 +11,7 @@ import m3u8
 import structlog
 
 from .base import AppleMusicBaseInterface
-from .constants import DRM_DEFAULT_KEY_MAPPING, MP4_FORMAT_CODECS, SONG_CODEC_REGEX_MAP
+from .constants import DRM_DEFAULT_KEY_MAPPING, MP4_FORMAT_CODECS, SONG_CODEC_REGEX_MAP, VARIOUS_ARTISTS_TRANSLATIONS
 from .enums import SongCodec, SyncedLyricsFormat
 from .exceptions import (
     GamdlInterfaceDecryptionNotAvailableError,
@@ -203,6 +203,15 @@ class AppleMusicSongInterface:
             f"{text}\n"
         )
 
+    def _round_timestamp(self, timestamp: datetime.datetime) -> datetime.datetime:
+        ms_new = timestamp.strftime("%f")[:-3]
+        if int(ms_new[-1]) >= 5:
+            ms = int(f"{int(ms_new[:2]) + 1}") * 10
+            timestamp += datetime.timedelta(milliseconds=ms) - datetime.timedelta(
+                microseconds=timestamp.microsecond
+            )
+        return timestamp
+
     def _get_lyrics_line_lrc(self, element: ElementTree.Element, enhanced: bool = False) -> str:
         timestamp_ttml = element.attrib.get("begin")
         
@@ -216,13 +225,7 @@ class AppleMusicSongInterface:
                     span_text = child.text or ""
                     span_tail = child.tail or ""
                     if span_begin:
-                        ts = self._parse_ttml_timestamp(span_begin)
-                        ms_new = ts.strftime("%f")[:-3]
-                        if int(ms_new[-1]) >= 5:
-                            ms = int(f"{int(ms_new[:2]) + 1}") * 10
-                            ts += datetime.timedelta(milliseconds=ms) - datetime.timedelta(
-                                microseconds=ts.microsecond
-                            )
+                        ts = self._round_timestamp(self._parse_ttml_timestamp(span_begin))
                         ts_str = f"<{ts.strftime('%M:%S.%f')[:-4]}>"
                         line_parts.append(f"{ts_str}{span_text}{span_tail}")
                     else:
@@ -231,14 +234,7 @@ class AppleMusicSongInterface:
         else:
             text = "".join(element.itertext()).strip()
 
-        timestamp = self._parse_ttml_timestamp(timestamp_ttml)
-        ms_new = timestamp.strftime("%f")[:-3]
-
-        if int(ms_new[-1]) >= 5:
-            ms = int(f"{int(ms_new[:2]) + 1}") * 10
-            timestamp += datetime.timedelta(milliseconds=ms) - datetime.timedelta(
-                microseconds=timestamp.microsecond
-            )
+        timestamp = self._round_timestamp(self._parse_ttml_timestamp(timestamp_ttml))
 
         return f"[{timestamp.strftime('%M:%S.%f')[:-4]}]{text}"
 
@@ -678,24 +674,7 @@ class AppleMusicSongInterface:
         artist_name = media.media_metadata["attributes"].get("artistName")
         artists = artists_rel if artists_rel else ([artist_name] if artist_name else [])
         
-        various_artists_translations = [
-            "various artists",
-            "vários intérpretes",
-            "vários artistas",
-            "varios artistas",
-            "various",
-            "divers artistes",
-            "verschiedene interpreten",
-            "artisti vari",
-            "diverse artiesten",
-            "ヴァリアス・アーティスト",
-            "オムニバス",
-            "群星",
-            "различные исполнители",
-            "разные артисты",
-            "여러 아티스트",
-        ]
-        if album_artist_name and album_artist_name.strip().lower() in various_artists_translations:
+        if album_artist_name and album_artist_name.strip().lower() in VARIOUS_ARTISTS_TRANSLATIONS:
             album_artists = ["Various Artists"]
         else:
             album_artists = album_artists_rel if album_artists_rel else ([album_artist_name] if album_artist_name else [])
