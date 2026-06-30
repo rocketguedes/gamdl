@@ -329,7 +329,7 @@ class AppleMusicApi:
 
         credits = await self._amp_request(
             APPLE_MUSIC_SONG_CREDITS_API_URI.format(
-                storefront=self.storefront,
+                storefront="us",
                 song_id=song_id,
             ),
         )

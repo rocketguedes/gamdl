@@ -48,6 +48,7 @@ class MediaTags:
     isrc: str = None
     upc: str = None
     record_label: str = None
+    remixer: list[str] = None
 
     def as_mp4_tags(self, date_format: str = None) -> dict:
         disc_mp4 = [
@@ -132,6 +133,7 @@ class MediaTags:
             "----:com.apple.iTunes:ISRC": self.isrc.encode("utf-8") if self.isrc is not None else None,
             "----:com.apple.iTunes:BARCODE": self.upc.encode("utf-8") if self.upc is not None else None,
             "----:com.apple.iTunes:LABEL": self.record_label.encode("utf-8") if self.record_label is not None else None,
+            "----:com.apple.iTunes:REMIXER": [r.encode("utf-8") if isinstance(r, str) else r for r in self.remixer] if self.remixer is not None else None,
         }
 
         def format_mp4_value(val: Any) -> Any:

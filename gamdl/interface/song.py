@@ -703,8 +703,9 @@ class AppleMusicSongInterface:
         else:
             releasetype = "album" if album_id else None
 
-        # Fetch composers from credits endpoint if available
+        # Fetch composers and remixers from credits endpoint if available
         composers = []
+        remixers = []
         if not media.is_library and self.base.apple_music_api:
             try:
                 credits_data = await self.base.get_song_credits_cached(media.media_id)
@@ -717,6 +718,14 @@ class AppleMusicSongInterface:
                             if artist.get("attributes", {}).get("name")
                         ]
                         break
+                for category in credits_data.get("data", []):
+                    category_relationships = category.get("relationships") or {}
+                    for artist in (category_relationships.get("credit-artists") or {}).get("data") or []:
+                        art_name = artist.get("attributes", {}).get("name")
+                        role_names = artist.get("attributes", {}).get("roleNames") or []
+                        if art_name and any("remix" in r.lower() for r in role_names):
+                            if art_name not in remixers:
+                                remixers.append(art_name)
             except Exception:
                 pass
 
@@ -763,6 +772,7 @@ class AppleMusicSongInterface:
         media.tags.isrc = isrc
         media.tags.upc = upc
         media.tags.record_label = record_label
+        media.tags.remixer = remixers if remixers else None
 
         if not self.skip_stream_info:
             m3u8_master_url = await self.get_m3u8_master_url(
