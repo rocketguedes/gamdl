@@ -449,6 +449,15 @@ class CliConfig:
             is_flag=True,
         ),
     ]
+    save_cover_format: Annotated[
+        CoverFormat,
+        option(
+            "--save-cover-format",
+            help="Format of the separate saved cover",
+            default=CoverFormat.RAW,
+            type=CoverFormat,
+        ),
+    ]
     save_playlist: Annotated[
         bool,
         option(

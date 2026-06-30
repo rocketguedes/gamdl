@@ -275,6 +275,7 @@ class AppleMusicBaseInterface:
     ) -> str:
         log = logger.bind(action="get_cover", media_id=metadata["id"])
 
+        original_template_url = metadata["attributes"]["artwork"]["url"]
         template_url = self._get_cover_template_url(metadata)
 
         if self.cover_format == CoverFormat.RAW:
@@ -289,7 +290,7 @@ class AppleMusicBaseInterface:
         cover_file_extension = await self._get_cover_file_extension(cover_url)
 
         cover = Cover(
-            template_url=template_url,
+            template_url=original_template_url,
             url=cover_url,
             file_extension=cover_file_extension,
         )

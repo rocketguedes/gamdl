@@ -176,6 +176,7 @@ The file is created automatically on first run. Command-line arguments override 
 | **File Output Options**         |                                                                   |                               |
 | `--overwrite`                   | Overwrite existing files                                          | `false`                       |
 | `--save-cover`, `-s`            | Save cover as separate file                                       | `false`                       |
+| `--save-cover-format`           | Format of the separate saved cover (`jpg`, `png`, `raw`)          | `raw`                         |
 | `--save-playlist`               | Save M3U8 playlist file                                           | `false`                       |
 
 ### Template Variables
@@ -214,7 +215,7 @@ The file is created automatically on first run. Command-line arguments override 
 
 - `jpg`
 - `png`
-- `raw` - Raw format as provided by the artist (requires `save_cover` to be enabled as it doesn't embed covers into files)
+- `raw` - Raw format as provided by the artist (only applicable for `--save-cover-format` or when `--save-cover` is enabled, as it doesn't embed covers into files)
 
 ### Metadata Language
 

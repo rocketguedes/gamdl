@@ -207,6 +207,7 @@ async def main(config: CliConfig):
         uploaded_video=uploaded_video_downloader,
         overwrite=config.overwrite,
         save_cover=config.save_cover,
+        save_cover_format=config.save_cover_format,
         save_playlist=config.save_playlist,
         no_synced_lyrics=config.no_synced_lyrics,
         synced_lyrics_only=config.synced_lyrics_only,

@@ -1,8 +1,13 @@
+from io import BytesIO
 import shutil
 from pathlib import Path
 from typing import AsyncGenerator
 
+from PIL import Image
 import structlog
+
+from ..interface.constants import IMAGE_FILE_EXTENSION_MAP
+from ..interface.enums import CoverFormat
 
 from ..interface.types import AppleMusicMedia
 from .constants import TEMP_PATH_TEMPLATE
@@ -28,6 +33,7 @@ class AppleMusicDownloader:
         uploaded_video: AppleMusicUploadedVideoDownloader,
         overwrite: bool = False,
         save_cover: bool = False,
+        save_cover_format: CoverFormat = CoverFormat.RAW,
         save_playlist: bool = False,
         no_synced_lyrics: bool = False,
         synced_lyrics_only: bool = False,
@@ -39,6 +45,7 @@ class AppleMusicDownloader:
         self.uploaded_video = uploaded_video
         self.overwrite = overwrite
         self.save_cover = save_cover
+        self.save_cover_format = save_cover_format
         self.save_playlist = save_playlist
         self.no_synced_lyrics = no_synced_lyrics
         self.synced_lyrics_only = synced_lyrics_only
@@ -164,13 +171,32 @@ class AppleMusicDownloader:
                 item.media.playlist_tags.track,
             )
 
-        if item.cover_path and self.save_cover and item.media.cover.url:
-            cover_bytes = await self.base.interface.base.get_cover_bytes(
-                item.media.cover.url,
-            )
+        if item.cover_path and self.save_cover and item.media.cover.template_url:
+            if self.save_cover_format == CoverFormat.RAW:
+                cover_url = self.base.interface.base._get_raw_cover_url(
+                    item.media.cover.template_url
+                )
+            else:
+                cover_url = self.base.interface.base.format_cover(
+                    item.media.cover.template_url,
+                    self.base.interface.base.cover_size,
+                    self.save_cover_format,
+                )
+            cover_bytes = await self.base.interface.base.get_cover_bytes(cover_url)
             if cover_bytes and (self.overwrite or not Path(item.cover_path).exists()):
+                cover_path = item.cover_path
+                try:
+                    image_obj = Image.open(BytesIO(cover_bytes))
+                    image_format = image_obj.format.lower()
+                    ext = IMAGE_FILE_EXTENSION_MAP.get(
+                        image_format,
+                        f".{image_format}",
+                    )
+                    cover_path = str(Path(cover_path).with_suffix(ext))
+                except Exception:
+                    pass
                 self._write_cover(
-                    item.cover_path,
+                    cover_path,
                     cover_bytes,
                 )
 
