@@ -327,12 +327,21 @@ class AppleMusicApi:
     ) -> dict:
         log = logger.bind(action="get_song_credits", song_id=song_id)
 
-        credits = await self._amp_request(
-            APPLE_MUSIC_SONG_CREDITS_API_URI.format(
-                storefront="us",
-                song_id=song_id,
-            ),
-        )
+        try:
+            credits = await self._amp_request(
+                APPLE_MUSIC_SONG_CREDITS_API_URI.format(
+                    storefront="us",
+                    song_id=song_id,
+                ),
+            )
+        except Exception as e:
+            log.debug("us_credits_failed_falling_back", error=str(e))
+            credits = await self._amp_request(
+                APPLE_MUSIC_SONG_CREDITS_API_URI.format(
+                    storefront=self.storefront,
+                    song_id=song_id,
+                ),
+            )
 
         log.debug("success", credits=credits)
 
