@@ -592,11 +592,17 @@ class AppleMusicSongInterface:
                 media.media_metadata
             )
             if catalog_metadata:
-                media.media_id = catalog_metadata["id"]
-                media.is_library = False
-                media.media_metadata = (
-                    await self.base.apple_music_api.get_song(media.media_id)
-                )["data"][0]
+                try:
+                    catalog_song = await self.base.apple_music_api.get_song(
+                        catalog_metadata["id"]
+                    )
+                    catalog_song_data = catalog_song["data"][0]
+                    if self.base.is_media_streamable(catalog_song_data):
+                        media.media_id = catalog_metadata["id"]
+                        media.is_library = False
+                        media.media_metadata = catalog_song_data
+                except Exception:
+                    pass
 
         yield media
 
