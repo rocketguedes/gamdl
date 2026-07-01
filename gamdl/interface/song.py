@@ -3,6 +3,7 @@ import base64
 import datetime
 import json
 import re
+import unicodedata
 from typing import AsyncGenerator, Callable
 from xml.dom import minidom
 from xml.etree import ElementTree
@@ -11,7 +12,7 @@ import m3u8
 import structlog
 
 from .base import AppleMusicBaseInterface
-from .constants import DRM_DEFAULT_KEY_MAPPING, MP4_FORMAT_CODECS, SONG_CODEC_REGEX_MAP, VARIOUS_ARTISTS_TRANSLATIONS
+from .constants import DRM_DEFAULT_KEY_MAPPING, MP4_FORMAT_CODECS, SONG_CODEC_REGEX_MAP, VARIOUS_ARTISTS_TRANSLATIONS, ROLE_TRANSLATION
 from .enums import SongCodec, SyncedLyricsFormat
 from .exceptions import (
     GamdlInterfaceDecryptionNotAvailableError,
@@ -28,6 +29,15 @@ from .types import (
 )
 
 logger = structlog.get_logger(__name__)
+
+
+def normalize_role(role: str) -> str:
+    role_lower = role.lower().strip()
+    if role_lower in ROLE_TRANSLATION:
+        return ROLE_TRANSLATION[role_lower]
+    # Remove accents for any unknown roles to ensure safe ASCII atom keys
+    nfkd_form = unicodedata.normalize('NFKD', role_lower)
+    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
 
 class AppleMusicSongInterface:
@@ -781,36 +791,36 @@ class AppleMusicSongInterface:
                         if not art_name:
                             continue
                         role_names = artist.get("attributes", {}).get("roleNames") or []
+                        norm_roles = [normalize_role(r) for r in role_names]
                         
                         # 1. Remixers
-                        if any("remix" in r.lower() for r in role_names):
+                        if any("remix" in r for r in norm_roles):
                             if art_name not in remixers:
                                 remixers.append(art_name)
                                 
                         # 2. Producers
-                        if any("producer" in r.lower() for r in role_names):
+                        if any("producer" in r for r in norm_roles):
                             if art_name not in producers:
                                 producers.append(art_name)
                                 
                         # 3. Mixers
-                        if any("mix" in r.lower() for r in role_names):
+                        if any("mix" in r for r in norm_roles):
                             if art_name not in mixers:
                                 mixers.append(art_name)
                                 
                         # 4. Engineers (mastering, recording, assistant, etc. - other engineering roles)
-                        if any("engineer" in r.lower() or "master" in r.lower() or "record" in r.lower() for r in role_names):
-                            if not any("mix" in r.lower() for r in role_names):
+                        if any("engineer" in r or "master" in r or "record" in r for r in norm_roles):
+                            if not any("mix" in r for r in norm_roles):
                                 if art_name not in engineers:
                                     engineers.append(art_name)
                                     
                         # 5. Performers (vocals, instruments)
                         if category.get("attributes", {}).get("kind") == "performer":
-                            for role in role_names:
-                                norm_role = role.lower().strip()
-                                if norm_role not in performer_dict:
-                                    performer_dict[norm_role] = []
-                                if art_name not in performer_dict[norm_role]:
-                                    performer_dict[norm_role].append(art_name)
+                            for role in norm_roles:
+                                if role not in performer_dict:
+                                    performer_dict[role] = []
+                                if art_name not in performer_dict[role]:
+                                    performer_dict[role].append(art_name)
             except Exception:
                 pass
 
