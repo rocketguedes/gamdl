@@ -632,6 +632,10 @@ class AppleMusicSongInterface:
         self,
         media: AppleMusicMedia,
     ) -> AsyncGenerator[AppleMusicMedia, None]:
+        log = logger.bind(
+            action="get_media",
+            media_id=media.media_id,
+        )
         if (
             not media.media_metadata
             or (
@@ -804,15 +808,18 @@ class AppleMusicSongInterface:
                                 producers.append(art_name)
                                 
                         # 3. Mixers
-                        if any("mix" in r for r in norm_roles):
+                        if any("mix" in r and "remix" not in r for r in norm_roles):
                             if art_name not in mixers:
                                 mixers.append(art_name)
                                 
                         # 4. Engineers (mastering, recording, assistant, etc. - other engineering roles)
-                        if any("engineer" in r or "master" in r or "record" in r for r in norm_roles):
-                            if not any("mix" in r for r in norm_roles):
-                                if art_name not in engineers:
-                                    engineers.append(art_name)
+                        if any(
+                            ("engineer" in r or "master" in r or "record" in r)
+                            and "mix" not in r
+                            for r in norm_roles
+                        ):
+                            if art_name not in engineers:
+                                engineers.append(art_name)
                                     
                         # 5. Performers (vocals, instruments)
                         if category.get("attributes", {}).get("kind") == "performer":
@@ -821,8 +828,8 @@ class AppleMusicSongInterface:
                                     performer_dict[role] = []
                                 if art_name not in performer_dict[role]:
                                     performer_dict[role].append(art_name)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("get_song_credits_failed", error=str(e))
 
         # Fallback to standard song resource composers relationship
         if not composers:
@@ -841,28 +848,17 @@ class AppleMusicSongInterface:
 
         isrc = tagging_metadata["attributes"].get("isrc") or media.media_metadata["attributes"].get("isrc")
 
-        if playback:
-            media.tags = await self.base.get_tags_from_asset_info(
-                playback["songList"][0]["assets"][0]["metadata"],
-                media.lyrics.unsynced if media.lyrics else None,
-                self.use_album_date,
-                artists=artists,
-                composers=composers,
-                album_artists=album_artists,
-                composer_sort=composer_sort,
-                releasetype=releasetype,
-            )
-        else:
-            media.tags = await self.base.get_tags_from_asset_info(
-                webplayback["songList"][0]["assets"][0]["metadata"],
-                media.lyrics.unsynced if media.lyrics else None,
-                self.use_album_date,
-                artists=artists,
-                composers=composers,
-                album_artists=album_artists,
-                composer_sort=composer_sort,
-                releasetype=releasetype,
-            )
+        playback_data = playback or webplayback
+        media.tags = await self.base.get_tags_from_asset_info(
+            playback_data["songList"][0]["assets"][0]["metadata"],
+            media.lyrics.unsynced if media.lyrics else None,
+            self.use_album_date,
+            artists=artists,
+            composers=composers,
+            album_artists=album_artists,
+            composer_sort=composer_sort,
+            releasetype=releasetype,
+        )
 
         media.tags.isrc = isrc
         media.tags.upc = upc
