@@ -554,22 +554,68 @@ class AppleMusicSongInterface:
             log.debug("no_webplayback")
             return None
 
-        stream_info = StreamInfo(drm_free=True)
-
-        if len(webplayback["songList"][0]["assets"]) == 0:
-            log.debug("no_matching_asset")
+        assets = webplayback["songList"][0]["assets"]
+        if len(assets) == 0:
+            log.debug("no_assets")
             return None
-        asset = webplayback["songList"][0]["assets"][0]
 
-        stream_info.stream_url = asset["URL"]
+        first_asset = assets[0]
+        url = first_asset.get("URL", "")
+        
+        if not url.endswith(".m3u8"):
+            stream_info = StreamInfo(drm_free=True)
+            stream_info.stream_url = url
+            stream_info_av = StreamInfoAv(
+                media_id=webplayback["songList"][0]["songId"],
+                audio_track=stream_info,
+                file_format=MediaFileFormat.M4A if first_asset.get("fileExtension") != "mp3" else MediaFileFormat.MP3,
+            )
+            return stream_info_av
+            
+        for codec in self.codec_priority:
+            flavor = codec.flavor
+            asset = next(
+                (i for i in assets if i.get("flavor") == flavor),
+                None,
+            )
+            if not asset:
+                continue
+                
+            stream_info = StreamInfo(
+                use_cenc=codec.is_cenc,
+            )
+            stream_info.stream_url = asset["URL"]
+            
+            m3u8_obj = m3u8.loads(
+                (await self.base.get_response(stream_info.stream_url)).text
+            )
+            
+            if stream_info.use_cenc:
+                stream_info.widevine_pssh = m3u8_obj.keys[0].uri
+            else:
+                stream_info.fairplay_key = m3u8_obj.keys[0].uri
+                
+            stream_info_av = StreamInfoAv(
+                media_id=webplayback["songList"][0]["songId"],
+                audio_track=stream_info,
+                file_format=MediaFileFormat.M4A,
+            )
+            log.debug("success", stream_info=stream_info_av)
+            return stream_info_av
 
+        stream_info = StreamInfo(
+            use_cenc=False,
+        )
+        stream_info.stream_url = first_asset["URL"]
+        m3u8_obj = m3u8.loads(
+            (await self.base.get_response(stream_info.stream_url)).text
+        )
+        stream_info.fairplay_key = m3u8_obj.keys[0].uri
         stream_info_av = StreamInfoAv(
             media_id=webplayback["songList"][0]["songId"],
             audio_track=stream_info,
             file_format=MediaFileFormat.M4A,
         )
-        log.debug("success", stream_info=stream_info_av)
-
         return stream_info_av
 
     async def get_media(
@@ -834,7 +880,8 @@ class AppleMusicSongInterface:
                 media.decryption_key = DecryptionKeyAv(
                     audio_track=await self.base.get_decryption_key(
                         media.stream_info.audio_track.widevine_pssh,
-                        media.media_id,
+                        media.stream_info.media_id if media.is_library else media.media_id,
+                        media.is_library,
                     )
                 )
 
