@@ -52,6 +52,7 @@ class MediaTags:
     producer: list[str] = None
     mixer: list[str] = None
     engineer: list[str] = None
+    performer: dict[str, list[str]] = None
 
     def as_mp4_tags(self, date_format: str = None) -> dict:
         disc_mp4 = [
@@ -151,11 +152,18 @@ class MediaTags:
                 return [val]
             return [val]
 
-        return {
+        formatted_tags = {
             k: format_mp4_value(v)
             for k, v in mp4_tags.items()
             if v is not None
         }
+
+        if self.performer:
+            for role, artists in self.performer.items():
+                key = f"----:com.apple.iTunes:performer:{role}"
+                formatted_tags[key] = [a.encode("utf-8") if isinstance(a, str) else a for a in artists]
+
+        return formatted_tags
 
 
 @dataclass

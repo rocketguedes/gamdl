@@ -760,6 +760,7 @@ class AppleMusicSongInterface:
         producers = []
         mixers = []
         engineers = []
+        performer_dict = {}
         credits_song_id = catalog_id if catalog_id else (media.media_id if not media.is_library else None)
         if credits_song_id and self.base.apple_music_api:
             try:
@@ -801,6 +802,15 @@ class AppleMusicSongInterface:
                             if not any("mix" in r.lower() for r in role_names):
                                 if art_name not in engineers:
                                     engineers.append(art_name)
+                                    
+                        # 5. Performers (vocals, instruments)
+                        if category.get("attributes", {}).get("kind") == "performer":
+                            for role in role_names:
+                                norm_role = role.lower().strip()
+                                if norm_role not in performer_dict:
+                                    performer_dict[norm_role] = []
+                                if art_name not in performer_dict[norm_role]:
+                                    performer_dict[norm_role].append(art_name)
             except Exception:
                 pass
 
@@ -851,6 +861,7 @@ class AppleMusicSongInterface:
         media.tags.producer = producers if producers else None
         media.tags.mixer = mixers if mixers else None
         media.tags.engineer = engineers if engineers else None
+        media.tags.performer = performer_dict if performer_dict else None
 
         if not self.skip_stream_info:
             m3u8_master_url = await self.get_m3u8_master_url(
