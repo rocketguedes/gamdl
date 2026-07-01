@@ -695,9 +695,12 @@ class AppleMusicSongInterface:
         else:
             releasetype = "album" if album_id else None
 
-        # Fetch composers and remixers from credits endpoint if available
+        # Fetch composers, remixers, producers, mixers, and engineers from credits endpoint if available
         composers = []
         remixers = []
+        producers = []
+        mixers = []
+        engineers = []
         if not media.is_library and self.base.apple_music_api:
             try:
                 credits_data = await self.base.get_song_credits_cached(media.media_id)
@@ -714,10 +717,30 @@ class AppleMusicSongInterface:
                     category_relationships = category.get("relationships") or {}
                     for artist in (category_relationships.get("credit-artists") or {}).get("data") or []:
                         art_name = artist.get("attributes", {}).get("name")
+                        if not art_name:
+                            continue
                         role_names = artist.get("attributes", {}).get("roleNames") or []
-                        if art_name and any("remix" in r.lower() for r in role_names):
+
+                        # 1. Remixers
+                        if any("remix" in r.lower() for r in role_names):
                             if art_name not in remixers:
                                 remixers.append(art_name)
+
+                        # 2. Producers
+                        if any("producer" in r.lower() for r in role_names):
+                            if art_name not in producers:
+                                producers.append(art_name)
+
+                        # 3. Mixers
+                        if any("mix" in r.lower() for r in role_names):
+                            if art_name not in mixers:
+                                mixers.append(art_name)
+
+                        # 4. Engineers (mastering, recording, assistant, etc. - other engineering roles)
+                        if any("engineer" in r.lower() or "master" in r.lower() or "record" in r.lower() for r in role_names):
+                            if not any("mix" in r.lower() for r in role_names):
+                                if art_name not in engineers:
+                                    engineers.append(art_name)
             except Exception:
                 pass
 
@@ -765,6 +788,9 @@ class AppleMusicSongInterface:
         media.tags.upc = upc
         media.tags.record_label = record_label
         media.tags.remixer = remixers if remixers else None
+        media.tags.producer = producers if producers else None
+        media.tags.mixer = mixers if mixers else None
+        media.tags.engineer = engineers if engineers else None
 
         if not self.skip_stream_info:
             m3u8_master_url = await self.get_m3u8_master_url(
