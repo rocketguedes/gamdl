@@ -59,19 +59,22 @@ class AppleMusicSongInterface:
             song_id=song_metadata["id"],
         )
 
-        if song_metadata["attributes"].get("playParams", {}).get("isLibrary"):
-            log.debug("library_song_no_lyrics")
-            return None
-
-        if not song_metadata["attributes"].get("hasLyrics"):
-            log.debug("no_lyrics")
-            return None
+        song_id = song_metadata["id"]
+        is_library = bool(song_metadata["attributes"].get("playParams", {}).get("isLibrary"))
+        
+        if is_library:
+            catalog_data = song_metadata.get("relationships", {}).get("catalog", {}).get("data")
+            if catalog_data:
+                song_id = catalog_data[0]["id"]
+            else:
+                log.debug("library_song_no_lyrics")
+                return None
 
         ttml = None
         # First, try to fetch syllable-lyrics (word-by-word synced lyrics)
         if self.base.apple_music_api:
             try:
-                syllable_url = f"/v1/catalog/{self.base.apple_music_api.storefront}/songs/{song_metadata['id']}/syllable-lyrics"
+                syllable_url = f"/v1/catalog/{self.base.apple_music_api.storefront}/songs/{song_id}/syllable-lyrics"
                 res = await self.base.apple_music_api._amp_request(syllable_url)
                 if "data" in res and res["data"]:
                     ttml = res["data"][0]["attributes"].get("ttml")
@@ -82,17 +85,22 @@ class AppleMusicSongInterface:
 
         if not ttml:
             if (
-                "relationships" not in song_metadata
+                is_library
+                or "relationships" not in song_metadata
                 or "lyrics" not in song_metadata["relationships"]
             ):
-                song_metadata = (
-                    await self.base.apple_music_api.get_song(
-                        song_metadata["id"],
-                    )
-                )["data"][0]
+                try:
+                    song_metadata = (
+                        await self.base.apple_music_api.get_song(
+                            song_id,
+                        )
+                    )["data"][0]
+                except Exception:
+                    pass
 
             if (
-                "lyrics" in song_metadata["relationships"]
+                "relationships" in song_metadata
+                and "lyrics" in song_metadata["relationships"]
                 and "data" in song_metadata["relationships"]["lyrics"]
                 and len(song_metadata["relationships"]["lyrics"]["data"]) > 0
                 and "attributes" in song_metadata["relationships"]["lyrics"]["data"][0]
@@ -587,16 +595,21 @@ class AppleMusicSongInterface:
                 )
             )["data"][0]
 
+        tagging_metadata = media.media_metadata
+        catalog_id = None
+
         if media.media_metadata["attributes"].get("playParams", {}).get("isLibrary"):
             catalog_metadata = self.base.get_catalog_metadata_from_library(
                 media.media_metadata
             )
             if catalog_metadata:
+                catalog_id = catalog_metadata["id"]
                 try:
                     catalog_song = await self.base.apple_music_api.get_song(
                         catalog_metadata["id"]
                     )
                     catalog_song_data = catalog_song["data"][0]
+                    tagging_metadata = catalog_song_data
                     if self.base.is_media_streamable(catalog_song_data):
                         media.media_id = catalog_metadata["id"]
                         media.is_library = False
@@ -617,9 +630,9 @@ class AppleMusicSongInterface:
                 media.index,
             )
 
-        media.cover = await self.base.get_cover(media.media_metadata)
+        media.cover = await self.base.get_cover(tagging_metadata)
 
-        media.lyrics = await self.get_lyrics(media.media_metadata)
+        media.lyrics = await self.get_lyrics(tagging_metadata)
 
         if self.base.wrapper_api:
             playback = (
@@ -643,7 +656,7 @@ class AppleMusicSongInterface:
                 media.is_library,
             )
 
-        relationships = media.media_metadata.get("relationships") or {}
+        relationships = tagging_metadata.get("relationships") or {}
         artists_rel = [
             a["attributes"]["name"]
             for a in (relationships.get("artists") or {}).get("data") or []
@@ -677,7 +690,7 @@ class AppleMusicSongInterface:
             except Exception:
                 pass
 
-        artist_name = media.media_metadata["attributes"].get("artistName")
+        artist_name = tagging_metadata["attributes"].get("artistName")
         artists = artists_rel if artists_rel else ([artist_name] if artist_name else [])
         
         if album_artist_name and album_artist_name.strip().lower() in VARIOUS_ARTISTS_TRANSLATIONS:
@@ -701,9 +714,10 @@ class AppleMusicSongInterface:
         producers = []
         mixers = []
         engineers = []
-        if not media.is_library and self.base.apple_music_api:
+        credits_song_id = catalog_id if catalog_id else (media.media_id if not media.is_library else None)
+        if credits_song_id and self.base.apple_music_api:
             try:
-                credits_data = await self.base.get_song_credits_cached(media.media_id)
+                credits_data = await self.base.get_song_credits_cached(credits_song_id)
                 for category in credits_data.get("data", []):
                     if category.get("attributes", {}).get("kind") == "composer-and-lyrics":
                         category_relationships = category.get("relationships") or {}
@@ -720,22 +734,22 @@ class AppleMusicSongInterface:
                         if not art_name:
                             continue
                         role_names = artist.get("attributes", {}).get("roleNames") or []
-
+                        
                         # 1. Remixers
                         if any("remix" in r.lower() for r in role_names):
                             if art_name not in remixers:
                                 remixers.append(art_name)
-
+                                
                         # 2. Producers
                         if any("producer" in r.lower() for r in role_names):
                             if art_name not in producers:
                                 producers.append(art_name)
-
+                                
                         # 3. Mixers
                         if any("mix" in r.lower() for r in role_names):
                             if art_name not in mixers:
                                 mixers.append(art_name)
-
+                                
                         # 4. Engineers (mastering, recording, assistant, etc. - other engineering roles)
                         if any("engineer" in r.lower() or "master" in r.lower() or "record" in r.lower() for r in role_names):
                             if not any("mix" in r.lower() for r in role_names):
@@ -759,7 +773,7 @@ class AppleMusicSongInterface:
             else:
                 composer_sort = composers[0]
 
-        isrc = media.media_metadata["attributes"].get("isrc")
+        isrc = tagging_metadata["attributes"].get("isrc") or media.media_metadata["attributes"].get("isrc")
 
         if playback:
             media.tags = await self.base.get_tags_from_asset_info(
