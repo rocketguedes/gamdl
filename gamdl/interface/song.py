@@ -41,8 +41,8 @@ def normalize_role(role: str) -> str:
     # Translate if known, otherwise keep the raw (but accent-free) base role
     translated = ROLE_TRANSLATION.get(base_role, base_role)
     
-    # Return in Title Case to standardize all tags to standard English formatting
-    return translated.title()
+    # Return in lowercase to ensure exact mapping compatibility with Navidrome's mappings.yaml
+    return translated
 
 
 class AppleMusicSongInterface:
