@@ -33,11 +33,16 @@ logger = structlog.get_logger(__name__)
 
 def normalize_role(role: str) -> str:
     role_lower = role.lower().strip()
-    if role_lower in ROLE_TRANSLATION:
-        return ROLE_TRANSLATION[role_lower]
-    # Remove accents for any unknown roles to ensure safe ASCII atom keys
+    
+    # Remove accents first to ensure our dictionary lookups match Portuguese inputs safely
     nfkd_form = unicodedata.normalize('NFKD', role_lower)
-    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+    base_role = "".join([c for c in nfkd_form if not unicodedata.combining(c)]).strip()
+    
+    # Translate if known, otherwise keep the raw (but accent-free) base role
+    translated = ROLE_TRANSLATION.get(base_role, base_role)
+    
+    # Return in Title Case to standardize all tags to standard English formatting
+    return translated.title()
 
 
 class AppleMusicSongInterface:
@@ -323,22 +328,44 @@ class AppleMusicSongInterface:
         else:
             return await self._get_m3u8_master_url_from_assets(song_metadata)
 
+    async def _get_m3u8_master_url(
+        self,
+        media_id: str,
+        playback: dict | None,
+    ) -> str | None:
+        if playback:
+            m3u8_master_url = self._get_m3u8_from_playback(playback)
+            if m3u8_master_url:
+                return m3u8_master_url
+
+        return await self._get_m3u8_master_url_from_assets(media_id)
+
     async def get_stream_info(
         self,
         media_id: str,
         is_library: bool,
-        m3u8_master_url: str | None = None,
         webplayback: dict | None = None,
+        playback: dict | None = None,
     ) -> StreamInfoAv:
         stream_info = None
 
         if is_library:
             stream_info = await self._get_library_stream_info(webplayback)
         else:
+            m3u8_master_url = None
+            fetched_m3u8_master_url = False
+
             for codec in self.codec_priority:
                 if codec.is_web:
                     stream_info = await self._get_web_stream_info(webplayback, codec)
                 else:
+                    if not fetched_m3u8_master_url:
+                        m3u8_master_url = await self._get_m3u8_master_url(
+                            media_id,
+                            playback,
+                        )
+                        fetched_m3u8_master_url = True
+
                     stream_info = await self._get_stream_info_nonweb(
                         m3u8_master_url,
                         codec,
@@ -674,68 +701,22 @@ class AppleMusicSongInterface:
             log.debug("no_webplayback")
             return None
 
-        assets = webplayback["songList"][0]["assets"]
-        if len(assets) == 0:
-            log.debug("no_assets")
+        stream_info = StreamInfo(drm_free=True)
+
+        if len(webplayback["songList"][0]["assets"]) == 0:
+            log.debug("no_matching_asset")
             return None
+        asset = webplayback["songList"][0]["assets"][0]
 
-        first_asset = assets[0]
-        url = first_asset.get("URL", "")
-        
-        if not url.endswith(".m3u8"):
-            stream_info = StreamInfo(drm_free=True)
-            stream_info.stream_url = url
-            stream_info_av = StreamInfoAv(
-                media_id=webplayback["songList"][0]["songId"],
-                audio_track=stream_info,
-                file_format=MediaFileFormat.M4A if first_asset.get("fileExtension") != "mp3" else MediaFileFormat.MP3,
-            )
-            return stream_info_av
-            
-        for codec in self.codec_priority:
-            flavor = codec.flavor
-            asset = next(
-                (i for i in assets if i.get("flavor") == flavor),
-                None,
-            )
-            if not asset:
-                continue
-                
-            stream_info = StreamInfo(
-                use_cenc=codec.is_cenc,
-            )
-            stream_info.stream_url = asset["URL"]
-            
-            m3u8_obj = m3u8.loads(
-                (await self.base.get_response(stream_info.stream_url)).text
-            )
-            
-            if stream_info.use_cenc:
-                stream_info.widevine_pssh = m3u8_obj.keys[0].uri
-            else:
-                stream_info.fairplay_key = m3u8_obj.keys[0].uri
-                
-            stream_info_av = StreamInfoAv(
-                media_id=webplayback["songList"][0]["songId"],
-                audio_track=stream_info,
-                file_format=MediaFileFormat.M4A,
-            )
-            log.debug("success", stream_info=stream_info_av)
-            return stream_info_av
+        stream_info.stream_url = asset["URL"]
 
-        stream_info = StreamInfo(
-            use_cenc=False,
-        )
-        stream_info.stream_url = first_asset["URL"]
-        m3u8_obj = m3u8.loads(
-            (await self.base.get_response(stream_info.stream_url)).text
-        )
-        stream_info.fairplay_key = m3u8_obj.keys[0].uri
         stream_info_av = StreamInfoAv(
             media_id=webplayback["songList"][0]["songId"],
             audio_track=stream_info,
             file_format=MediaFileFormat.M4A,
         )
+        log.debug("success", stream_info=stream_info_av)
+
         return stream_info_av
 
     async def get_media(
@@ -980,16 +961,11 @@ class AppleMusicSongInterface:
         media.tags.performer = performer_dict if performer_dict else None
 
         if not self.skip_stream_info:
-            m3u8_master_url = await self.get_m3u8_master_url(
-                playback,
-                media.media_metadata,
-            )
-
             media.stream_info = await self.get_stream_info(
                 media.media_id,
                 media.is_library,
-                m3u8_master_url,
                 webplayback,
+                playback,
             )
 
             if media.stream_info.audio_track.drm_free:
