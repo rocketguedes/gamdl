@@ -121,7 +121,7 @@ VARIOUS_ARTISTS_TRANSLATIONS = [
 ]
 
 ROLE_TRANSLATION = {
-    # Portuguese to English
+    # Basic Translations
     "vocais": "vocals",
     "vocal": "vocals",
     "voz": "vocals",
@@ -139,6 +139,7 @@ ROLE_TRANSLATION = {
     "programming": "programming",
     "dj": "dj",
     "remix": "remixer",
+    "remixagem": "remixer",
     "remixador": "remixer",
     "remixer": "remixer",
     "mixagem": "mixer",
@@ -149,6 +150,8 @@ ROLE_TRANSLATION = {
     "engineer": "engineer",
     "masterização": "engineer",
     "mastering": "engineer",
+
+    # Instruments (General)
     "baixo": "bass",
     "bass": "bass",
     "bateria": "drums",
@@ -158,8 +161,10 @@ ROLE_TRANSLATION = {
     "guitarra": "guitar",
     "guitar": "guitar",
     "violão": "acoustic guitar",
-    "teclado": "keyboard",
-    "keyboard": "keyboard",
+    "teclado": "keyboards",
+    "teclados": "keyboards",
+    "keyboard": "keyboards",
+    "keyboards": "keyboards",
     "piano": "piano",
     "sintetizador": "synthesizer",
     "synthesizer": "synthesizer",
@@ -177,5 +182,41 @@ ROLE_TRANSLATION = {
     "metais": "horns",
     "sopros": "horns",
     "horns": "horns",
+    "cordas": "strings",
+    "strings": "strings",
+    "eletronicos": "electronics",
+    "coral": "choir",
+    "choir": "choir",
+    
+    # Advanced & Specific SubRoles (Portuguese to English)
+    "vocais principais": "lead vocals",
+    "vocal principal": "lead vocals",
+    "vocal de apoio": "background vocals",
+    "vocais de apoio": "background vocals",
+    "coro": "background vocals",
+    "guitarra eletrica": "electric guitar",
+    "violao acustico": "acoustic guitar",
+    "guitarra lider": "lead guitar",
+    "guitarra solo": "lead guitar",
+    "guitarra base": "rhythm guitar",
+    "baixo de 10 cordas": "10-string bass guitar",
+    "baixo eletrico": "electric bass guitar",
+    "piano rhodes": "rhodes piano",
+    "saxofone tenor": "tenor saxophone",
+    "saxofone baritono": "baritone saxophone",
+    "saxofone alto": "alto saxophone",
+    "programacao de sintetizador": "synthesizer programming",
+    "programacao de bateria": "drum programming",
+    "bateria eletronica": "drum machine",
+    "sampleador": "sampler",
+    "samples (artista original)": "sampled artist",
+    "todos os instrumentos": "all instruments",
+    "interpretacao": "musician",
+    "regencia": "conductor",
+    "batida de pe": "foot stomps",
+    "gritos": "screams",
+    "aplausos": "hand claps",
+    "palmas": "hand claps",
+    "claps": "hand claps",
 }
 
