@@ -5,7 +5,6 @@ import json
 import re
 import unicodedata
 from typing import AsyncGenerator, Callable
-from xml.dom import minidom
 from xml.etree import ElementTree
 
 import m3u8
@@ -163,7 +162,12 @@ class AppleMusicSongInterface:
             synced_lyrics = []
             index = 1
             if fmt == SyncedLyricsFormat.TTML:
-                synced_lyrics_dict[fmt] = minidom.parseString(lyrics_ttml).toprettyxml()
+                # Do NOT use minidom.toprettyxml() here: it injects indentation
+                # whitespace between sibling <span> elements, which Navidrome's
+                # TTML parser collapses to spaces — turning "superstitious"
+                # (three adjacent spans: super/sti/tious) into "super sti tious".
+                # The original TTML from Apple's API is already well-formed XML.
+                synced_lyrics_dict[fmt] = lyrics_ttml
                 continue
 
             for div in lyrics_ttml_et.iter("{http://www.w3.org/ns/ttml}div"):
