@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "gamdl"
-version = "3.8.2"
+version = "3.8.4"
 description = "A command-line app for downloading Apple Music songs, music videos and post videos."
 readme = "README.md"
 license = "MIT"
@@ -44,3 +44,4 @@ module-name = "gamdl._ammuxer"
 python-source = "."
 features = ["pyo3/extension-module"]
 include = ["LICENSE"]
+exclude = ["**/target/**"]
