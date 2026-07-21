@@ -869,6 +869,7 @@ class AppleMusicSongInterface:
         producers = []
         mixers = []
         engineers = []
+        conductors = []
         performer_dict = {}
         credits_song_id = catalog_id if catalog_id else (media.media_id if not media.is_library else None)
         if credits_song_id and self.base.apple_music_api:
@@ -916,7 +917,12 @@ class AppleMusicSongInterface:
                             if art_name not in engineers:
                                 engineers.append(art_name)
                                     
-                        # 5. Performers (vocals, instruments)
+                        # 5. Conductors
+                        if any("conductor" in r for r in norm_roles):
+                            if art_name not in conductors:
+                                conductors.append(art_name)
+                                    
+                        # 6. Performers (vocals, instruments)
                         if category.get("attributes", {}).get("kind") == "performer":
                             for role in norm_roles:
                                 if role not in performer_dict:
@@ -962,6 +968,7 @@ class AppleMusicSongInterface:
         media.tags.producer = producers if producers else None
         media.tags.mixer = mixers if mixers else None
         media.tags.engineer = engineers if engineers else None
+        media.tags.conductor = conductors if conductors else None
         media.tags.performer = performer_dict if performer_dict else None
 
         if not self.skip_stream_info:

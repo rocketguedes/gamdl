@@ -53,6 +53,11 @@ class MediaTags:
     mixer: list[str] = None
     engineer: list[str] = None
     performer: dict[str, list[str]] = None
+    conductor: list[str] = None
+    work: str = None
+    movement_name: str = None
+    movement_number: int = None
+    movement_count: int = None
 
     def as_mp4_tags(self, date_format: str = None) -> dict:
         disc_mp4 = [
@@ -141,6 +146,11 @@ class MediaTags:
             "----:com.apple.iTunes:PRODUCER": [p.encode("utf-8") if isinstance(p, str) else p for p in self.producer] if self.producer is not None else None,
             "----:com.apple.iTunes:MIXER": [m.encode("utf-8") if isinstance(m, str) else m for m in self.mixer] if self.mixer is not None else None,
             "----:com.apple.iTunes:ENGINEER": [e.encode("utf-8") if isinstance(e, str) else e for e in self.engineer] if self.engineer is not None else None,
+            "----:com.apple.iTunes:CONDUCTOR": [c.encode("utf-8") if isinstance(c, str) else c for c in self.conductor] if self.conductor is not None else None,
+            "\xa9wrk": self.work,
+            "\xa9mvn": self.movement_name,
+            "mvi ": [str(self.movement_number)] if self.movement_number is not None else None,
+            "mvc ": [str(self.movement_count)] if self.movement_count is not None else None,
         }
 
         def format_mp4_value(val: Any) -> Any:

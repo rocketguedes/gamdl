@@ -431,6 +431,10 @@ class AppleMusicBaseInterface:
             track=asset_data.get("trackNumber"),
             track_total=asset_data.get("trackCount"),
             xid=asset_data.get("xid"),
+            work=asset_data.get("work"),
+            movement_name=asset_data.get("movement"),
+            movement_number=asset_data.get("movement-number"),
+            movement_count=asset_data.get("movement-count"),
         )
 
         log.debug("success", tags=tags)
